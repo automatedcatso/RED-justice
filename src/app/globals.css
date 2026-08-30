@@ -1,0 +1,321 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  /* Crimson scale (RED Justice brand) */
+  --color-crimson-50: oklch(0.97 0.02 25);
+  --color-crimson-100: oklch(0.93 0.05 25);
+  --color-crimson-200: oklch(0.85 0.10 25);
+  --color-crimson-300: oklch(0.76 0.15 25);
+  --color-crimson-400: oklch(0.68 0.19 25);
+  --color-crimson-500: oklch(0.62 0.22 25);
+  --color-crimson-600: oklch(0.55 0.22 25);
+  --color-crimson-700: oklch(0.48 0.20 25);
+  --color-crimson-800: oklch(0.40 0.16 25);
+  --color-crimson-900: oklch(0.32 0.12 25);
+  --color-crimson-950: oklch(0.22 0.08 25);
+}
+
+/* RED Justice investigation theme — dark by default.
+   Crimson accent on a near-black slate background. The default :root is
+   the dark palette so the app feels like an investigation console; .light
+   is the alternate light mode (use class strategy on <html>). */
+:root {
+  --radius: 0.5rem;
+
+  /* dark investigation */
+  --background: oklch(0.16 0.012 260);
+  --foreground: oklch(0.96 0.005 240);
+  --card: oklch(0.20 0.014 260);
+  --card-foreground: oklch(0.96 0.005 240);
+  --popover: oklch(0.22 0.014 260);
+  --popover-foreground: oklch(0.96 0.005 240);
+  --primary: oklch(0.62 0.22 25);          /* crimson */
+  --primary-foreground: oklch(0.98 0.005 0);
+  --secondary: oklch(0.26 0.015 260);
+  --secondary-foreground: oklch(0.96 0.005 240);
+  --muted: oklch(0.24 0.014 260);
+  --muted-foreground: oklch(0.72 0.012 240);
+  --accent: oklch(0.30 0.06 25);
+  --accent-foreground: oklch(0.98 0.005 0);
+  --destructive: oklch(0.65 0.25 27);
+  --border: oklch(1 0 0 / 8%);
+  --input: oklch(1 0 0 / 10%);
+  --ring: oklch(0.55 0.20 25);
+  --chart-1: oklch(0.62 0.22 25);   /* crimson */
+  --chart-2: oklch(0.70 0.18 145);  /* emerald */
+  --chart-3: oklch(0.75 0.16 80);   /* amber */
+  --chart-4: oklch(0.68 0.16 230);  /* sky */
+  --chart-5: oklch(0.70 0.20 305);  /* magenta */
+  --sidebar: oklch(0.18 0.012 260);
+  --sidebar-foreground: oklch(0.96 0.005 240);
+  --sidebar-primary: oklch(0.62 0.22 25);
+  --sidebar-primary-foreground: oklch(0.98 0.005 0);
+  --sidebar-accent: oklch(0.26 0.014 260);
+  --sidebar-accent-foreground: oklch(0.96 0.005 240);
+  --sidebar-border: oklch(1 0 0 / 8%);
+  --sidebar-ring: oklch(0.55 0.20 25);
+}
+
+.light {
+  --background: oklch(0.985 0.002 240);
+  --foreground: oklch(0.18 0.01 260);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.01 260);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.18 0.01 260);
+  --primary: oklch(0.52 0.22 25);
+  --primary-foreground: oklch(0.98 0.005 0);
+  --secondary: oklch(0.96 0.005 240);
+  --secondary-foreground: oklch(0.20 0.014 260);
+  --muted: oklch(0.96 0.005 240);
+  --muted-foreground: oklch(0.45 0.012 240);
+  --accent: oklch(0.94 0.02 25);
+  --accent-foreground: oklch(0.20 0.014 260);
+  --destructive: oklch(0.58 0.24 27);
+  --border: oklch(0.90 0.005 240);
+  --input: oklch(0.90 0.005 240);
+  --ring: oklch(0.55 0.20 25);
+  --chart-1: oklch(0.52 0.22 25);
+  --chart-2: oklch(0.60 0.18 145);
+  --chart-3: oklch(0.70 0.18 80);
+  --chart-4: oklch(0.58 0.18 230);
+  --chart-5: oklch(0.60 0.20 305);
+  --sidebar: oklch(0.97 0.005 240);
+  --sidebar-foreground: oklch(0.18 0.01 260);
+  --sidebar-primary: oklch(0.52 0.22 25);
+  --sidebar-primary-foreground: oklch(0.98 0.005 0);
+  --sidebar-accent: oklch(0.94 0.02 25);
+  --sidebar-accent-foreground: oklch(0.20 0.014 260);
+  --sidebar-border: oklch(0.90 0.005 240);
+  --sidebar-ring: oklch(0.55 0.20 25);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "ss01", "cv11";
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--muted);
+    border-radius: 6px;
+    border: 2px solid var(--background);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--muted-foreground);
+  }
+}
+
+/* subtle scanline texture for the investigation feel */
+.bg-investigation-grid {
+  background-image:
+    linear-gradient(to right, oklch(1 0 0 / 0.025) 1px, transparent 1px),
+    linear-gradient(to bottom, oklch(1 0 0 / 0.025) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+.text-glow-crimson {
+  text-shadow: 0 0 12px oklch(0.62 0.22 25 / 0.45);
+}
+
+@keyframes pulse-crimson {
+  0%, 100% { box-shadow: 0 0 0 0 oklch(0.62 0.22 25 / 0.5); }
+  50% { box-shadow: 0 0 0 8px oklch(0.62 0.22 25 / 0); }
+}
+.pulse-crimson {
+  animation: pulse-crimson 2.4s ease-out infinite;
+}
+
+/* Fade-in animation for views */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fade-in-up {
+  animation: fade-in-up 0.35s ease-out;
+}
+
+/* Slide-in animation for panels */
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+.animate-slide-in-right {
+  animation: slide-in-right 0.3s ease-out;
+}
+
+/* Shimmer effect for loading states */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--muted) 0%,
+    var(--muted-foreground) 50%,
+    var(--muted) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+
+/* Glow border on hover */
+.glow-border-hover {
+  transition: box-shadow 0.25s ease, border-color 0.25s ease;
+}
+.glow-border-hover:hover {
+  box-shadow: 0 0 0 1px oklch(0.62 0.22 25 / 0.3), 0 0 20px oklch(0.62 0.22 25 / 0.15);
+}
+
+/* Card hover lift */
+.card-lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.card-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px oklch(0 0 0 / 0.25);
+}
+
+/* Gradient text */
+.gradient-text-crimson {
+  background: linear-gradient(135deg, oklch(0.72 0.22 25), oklch(0.55 0.20 25));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Stagger animation for list items */
+@keyframes stagger-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.animate-stagger {
+  animation: stagger-in 0.3s ease-out backwards;
+}
+
+/* Safe scroll area — never goes negative on small screens */
+.scroll-area-safe {
+  height: calc(100vh - 360px);
+  min-height: 200px;
+}
+.scroll-area-tall {
+  height: calc(100vh - 280px);
+  min-height: 200px;
+}
+.scroll-area-short {
+  height: calc(100vh - 440px);
+  min-height: 200px;
+}
+.scroll-area-shortest {
+  height: calc(100vh - 460px);
+  min-height: 200px;
+}
+
+/*
+ * Radix ScrollArea overflow fix (the "content escapes the black window" bug).
+ * When a ScrollArea root only has a max-height (e.g. `max-h-72`), the Radix
+ * viewport keeps its natural content height and the rows visually spill out
+ * past the card boundary. Making the viewport inherit the root's max-height
+ * constrains it properly so the internal scrollbar engages instead.
+ * Works for every max-h-* usage without touching each call-site.
+ */
+[data-radix-scroll-area-viewport] {
+  max-height: inherit;
+}
+/* Belt-and-braces: never let scroll-area content escape horizontally either. */
+[data-radix-scroll-area-viewport] > div {
+  max-width: 100%;
+}
+
+/*
+ * Global long-token guard — hashes, UUIDs, phone numbers, UPI ids and
+ * account numbers used to push past card edges (the "data escaping the
+ * black window" bug). `overflow-wrap: anywhere` only breaks a token when
+ * it physically cannot fit, so normal text is untouched.
+ */
+main {
+  overflow-wrap: anywhere;
+}
+
+/* Prevent text from breaking layout in any card */
+.text-clip-safe {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* Grid item that never overflows */
+.grid-item-safe {
+  min-width: 0;
+  overflow: hidden;
+}

@@ -1,0 +1,70 @@
+# RED Justice — Docker Compose for secure containerized deployment
+#
+# Usage:
+#   docker compose up --build
+#
+# The app runs on port 8008. Ollama runs on the host (not in a container)
+# so the app connects to it via host.docker.internal.
+#
+# For full isolation, see the "ollama" service below (uncomment to use).
+
+services:
+  red-justice:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: red-justice
+    ports:
+      - "8008:8008"
+    volumes:
+      # Persist the SQLite database across container restarts
+      - red-justice-db:/app/db
+    environment:
+      - NODE_ENV=production
+      - PORT=8008
+      - DATABASE_URL=file:/app/db/red-justice.db
+      # Connect to Ollama running on the host
+      - LOCAL_AI_BASE_URL=http://host.docker.internal:11434/v1
+      - LOCAL_AI_MODEL=llama3.2
+      - LOCAL_AI_TIMEOUT_MS=120000
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8008/api/system/status"]
+      interval: 30s
+      timeout: 10s
+      start_period: 15s
+      retries: 3
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: false
+    tmpfs:
+      - /tmp:noexec,nosuid,size=100m
+
+  # Uncomment to run Ollama inside Docker too (for full isolation):
+  #
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   container_name: red-justice-ollama
+  #   ports:
+  #     - "11434:11434"
+  #   volumes:
+  #     - ollama-models:/root/.ollama
+  #   environment:
+  #     - OLLAMA_HOST=0.0.0.0
+  #   restart: unless-stopped
+  #   # Uncomment for GPU support:
+  #   # deploy:
+  #   #   resources:
+  #   #     reservations:
+  #   #       devices:
+  #   #         - driver: nvidia
+  #   #           count: 1
+  #   #           capabilities: [gpu]
+
+volumes:
+  red-justice-db:
+  # ollama-models:

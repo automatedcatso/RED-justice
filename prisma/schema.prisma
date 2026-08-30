@@ -1,0 +1,630 @@
+// RED Justice — Prisma schema
+// AI-Powered Criminal Network Analysis & Investigation System
+// SQLite-backed graph layer (Neo4j replaced by relational graph + in-process analytics)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CASE MANAGEMENT
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Case {
+  id             String   @id @default(cuid())
+  uid            String   @unique
+  title          String
+  description    String?
+  status         String   @default("open")
+  classification String   @default("unclassified")
+  aiMode         String   @default("standard")
+  investigators  String?
+  tags           String?
+  sourceMetadata String?
+  notes          String?
+  metadataJson   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  evidence       Evidence[]
+  entities       Entity[]
+  relationships  Relationship[]
+  transactions   Transaction[]
+  communications Communication[]
+  timeline       TimelineEvent[]
+  findings       Finding[]
+  actorRisks     ActorRisk[]
+  communities    Community[]
+  jobs           ProcessingJob[]
+  aiChats        AiChat[]
+  notes2         InvestigatorNote[]
+  activity       ActivityLog[]
+  contradictions Contradiction[]
+  snapshots      GraphSnapshot[]
+  observations   EntityObservation[]
+  claims         Claim[]
+  decisions      DecisionRecord[]
+
+  @@index([status])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EVIDENCE VAULT
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Evidence {
+  id                       String   @id @default(cuid())
+  caseId                   String
+  case                     Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  originalName             String
+  storedPath               String?
+  mime                     String?
+  size                     Int      @default(0)
+  sha256                   String
+  source                   String?
+  description              String?
+  status                   String   @default("pending")
+  extractionStatus         String?  @default("pending")
+  ocrStatus                String?  @default("n/a")
+  processingErrors         String?
+  content                  String?
+  metadataJson             String?
+  intelJson                String?
+  provenance               String?
+  parentArchiveId          String?
+  // AI evidence classification (bank_statement / fir / cdr / whatsapp_chat / …)
+  classification           String?
+  classificationConfidence Float?
+  classificationSource     String? // ai | deterministic | manual
+  // v3 Fully-AI pipeline — automatic AI analysis state machine.
+  // queued → running → complete | failed (null = pre-v3 row / not yet queued)
+  aiScanStatus             String?
+  aiScanError              String?
+  aiScanFinishedAt         DateTime?
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  entityLinks    EntityLink[]
+  transactions   Transaction[]
+  communications Communication[]
+  timelineEvents TimelineEvent[]
+  chainOfCustody ChainOfCustody[]
+  evidenceStages EvidenceStage[]
+  versions       EvidenceVersion[]
+
+  @@unique([caseId, sha256])
+  @@index([caseId])
+  @@index([sha256])
+}
+
+model ChainOfCustody {
+  id         String   @id @default(cuid())
+  evidenceId String
+  evidence   Evidence @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+  action     String
+  sha256     String?
+  actor      String?
+  at         DateTime @default(now())
+}
+
+model EvidenceStage {
+  evidenceId String
+  stage      String
+  state      String
+  detail     String?
+  at         DateTime @default(now())
+
+  evidence Evidence @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+
+  @@id([evidenceId, stage])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ENTITY INTELLIGENCE
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Entity {
+  id           String   @id @default(cuid())
+  caseId       String
+  case         Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  type         String
+  value        String
+  norm         String
+  label        String?
+  confidence   Float    @default(1.0)
+  /** v3.9 master-prompt reconciliation gate:
+   *  confirmed — deterministic checksum/domain-validated entities, or AI
+   *              entities with high confidence / cross-chunk corroboration;
+   *  candidate — AI entities below the confirmation threshold. NEVER deleted:
+   *  kept for human review, later evidence, or deeper-model analysis. */
+  status       String   @default("confirmed")
+  metadataJson String?
+  resolvedToId String?
+  createdAt    DateTime @default(now())
+
+  links        EntityLink[]
+  srcRels      Relationship[]      @relation("RelSrc")
+  dstRels      Relationship[]      @relation("RelDst")
+  actorRisks   ActorRisk[]
+  communityMem CommunityMember[]
+  observations EntityObservation[]
+
+  @@unique([caseId, type, norm])
+  @@index([caseId])
+  @@index([caseId, type])
+  @@index([caseId, status])
+}
+
+model EntityLink {
+  entityId   String
+  evidenceId String
+  entity     Entity   @relation(fields: [entityId], references: [id], onDelete: Cascade)
+  evidence   Evidence @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+
+  @@id([entityId, evidenceId])
+  @@index([evidenceId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// KNOWLEDGE GRAPH (SQLite-backed)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Relationship {
+  id               String   @id @default(cuid())
+  caseId           String
+  case             Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  srcId            String
+  src              Entity   @relation("RelSrc", fields: [srcId], references: [id], onDelete: Cascade)
+  dstId            String
+  dst              Entity   @relation("RelDst", fields: [dstId], references: [id], onDelete: Cascade)
+  type             String   @default("CO_OCCURRED")
+  weight           Int      @default(1)
+  confidence       Float    @default(1.0)
+  amount           Float?
+  currency         String?
+  timestamp        String?
+  evidenceRef      String?
+  evidenceId       String? // direct FK-style link to the producing evidence file
+  locator          String? // page/row/record locator inside the source file
+  provenance       String?
+  extractionMethod String?
+  metadataJson     String?
+  createdAt        DateTime @default(now())
+
+  @@unique([caseId, srcId, dstId, type])
+  @@index([caseId])
+  @@index([srcId])
+  @@index([dstId])
+  @@index([evidenceId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TRANSACTIONS / MONEY FLOW
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Transaction {
+  id              String   @id @default(cuid())
+  caseId          String
+  case            Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  evidenceId      String
+  evidence        Evidence @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+  sourceFile      String?
+  sourceRef       String?
+  layer           Int?
+  txnDate         String?
+  utr             String?
+  amount          Float?
+  disputedAmount  Float?
+  senderAccount   String?
+  receiverAccount String?
+  accountNo       String?
+  ifsc            String?
+  bank            String?
+  upi             String?
+  wallet          String?
+  merchant        String?
+  status          String?
+  remarks         String?
+  metadataJson    String?
+  createdAt       DateTime @default(now())
+
+  @@index([caseId])
+  @@index([caseId, senderAccount])
+  @@index([caseId, receiverAccount])
+  @@index([caseId, utr])
+  @@index([caseId, amount])
+  @@index([evidenceId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COMMUNICATIONS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Communication {
+  id              String   @id @default(cuid())
+  caseId          String
+  case            Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  evidenceId      String
+  evidence        Evidence @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+  platform        String?
+  sender          String?
+  receiver        String?
+  senderHandle    String?
+  receiverHandle  String?
+  messageText     String?
+  timestamp       String?
+  entitiesJson    String?
+  attachmentsJson String?
+  urlsJson        String?
+  amountsJson     String?
+  riskFlagsJson   String?
+  sourceRef       String?
+  confidence      Float    @default(1.0)
+  createdAt       DateTime @default(now())
+
+  @@index([caseId])
+  @@index([evidenceId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TIMELINE
+// ─────────────────────────────────────────────────────────────────────────────
+
+model TimelineEvent {
+  id               String    @id @default(cuid())
+  caseId           String
+  case             Case      @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  ts               String?
+  sourceEvidenceId String?
+  evidence         Evidence? @relation(fields: [sourceEvidenceId], references: [id], onDelete: SetNull)
+  kind             String?
+  summary          String?
+  metadataJson     String?
+  createdAt        DateTime  @default(now())
+
+  @@index([caseId, ts])
+  @@index([caseId, kind])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SUSPICIOUS PATTERNS / FINDINGS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Finding {
+  id                 String    @id @default(cuid())
+  caseId             String
+  case               Case      @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  type               String
+  severity           String    @default("medium")
+  confidence         Float     @default(0.5)
+  description        String
+  trigger            String?
+  entitiesJson       String?
+  relationshipsJson  String?
+  transactionsJson   String?
+  supportingEvidence String?
+  reviewStatus       String    @default("new")
+  reviewerNote       String?
+  // Investigator Decision Record (structured, audited)
+  decision           String? // approved | rejected | modified
+  decidedAt          DateTime?
+  decidedBy          String?
+  decisionNote       String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([caseId])
+  @@index([caseId, type])
+  @@index([caseId, severity])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ACTOR RISK / PRIORITIZATION
+// ─────────────────────────────────────────────────────────────────────────────
+
+model ActorRisk {
+  id               String   @id @default(cuid())
+  caseId           String
+  case             Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  entityId         String
+  entity           Entity   @relation(fields: [entityId], references: [id], onDelete: Cascade)
+  score            Float    @default(0)
+  componentsJson   String?
+  contributorsJson String?
+  updatedAt        DateTime @updatedAt
+
+  @@unique([caseId, entityId])
+  @@index([caseId, score])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EVIDENCE CONTRADICTION GRAPH
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Contradiction {
+  id              String   @id @default(cuid())
+  caseId          String
+  case            Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  relation        String   @default("contradicts") // contradicts | supports | supersedes | unresolved
+  subjectType     String // transaction | entity | finding | communication
+  subjectAId      String?
+  subjectBId      String?
+  subjectARef     String?
+  subjectBRef     String?
+  description     String
+  status          String   @default("open") // open | resolved | accepted
+  resolutionNote  String?
+  evidenceIdsJson String?
+  detector        String? // deterministic | ai | manual
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([caseId])
+  @@index([caseId, status])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GRAPH SNAPSHOTS (T1 vs T2 comparison)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model GraphSnapshot {
+  id         String   @id @default(cuid())
+  caseId     String
+  case       Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  label      String
+  nodesCount Int      @default(0)
+  edgesCount Int      @default(0)
+  dataJson   String
+  createdAt  DateTime @default(now())
+
+  @@index([caseId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PROVENANCE-PRESERVING ENTITY OBSERVATIONS
+// (individual source observations retained even after entity resolution)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model EntityObservation {
+  id               String   @id @default(cuid())
+  caseId           String
+  case             Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  entityId         String
+  entity           Entity   @relation(fields: [entityId], references: [id], onDelete: Cascade)
+  rawType          String
+  rawValue         String
+  norm             String
+  evidenceId       String?
+  evidenceName     String?
+  locator          String?
+  extractionMethod String?
+  mergedFromId     String?
+  createdAt        DateTime @default(now())
+
+  @@index([caseId])
+  @@index([entityId])
+  @@index([evidenceId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CLAIM GRAPH — Evidence → Observation → Finding → Hypothesis → Claim → Report
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Claim {
+  id          String   @id @default(cuid())
+  caseId      String
+  case        Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  level       String // observation | finding | hypothesis | claim | report
+  refId       String?
+  text        String
+  status      String   @default("unsupported") // unsupported | supported | verified | rejected
+  sourcesJson String?
+  parentId    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([caseId])
+  @@index([caseId, level])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COMMUNITIES
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Community {
+  id                 String   @id @default(cuid())
+  caseId             String
+  case               Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  label              String?
+  size               Int      @default(0)
+  dominantTypes      String?
+  transactionVolume  Float?   @default(0)
+  internalRels       Int      @default(0)
+  externalRels       Int      @default(0)
+  centralActorsJson  String?
+  bridgeActorsJson   String?
+  suspiciousPatterns Int      @default(0)
+  supportingEvidence String?
+  metadataJson       String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  members CommunityMember[]
+
+  @@index([caseId])
+}
+
+model CommunityMember {
+  communityId String
+  entityId    String
+  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  entity      Entity    @relation(fields: [entityId], references: [id], onDelete: Cascade)
+
+  @@id([communityId, entityId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// JOB PROCESSING
+// ─────────────────────────────────────────────────────────────────────────────
+
+model ProcessingJob {
+  id          String    @id @default(cuid())
+  caseId      String?
+  case        Case?     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  type        String
+  status      String    @default("queued")
+  progress    Float     @default(0)
+  detail      String?
+  payloadJson String?
+  resultJson  String?
+  createdAt   DateTime  @default(now())
+  startedAt   DateTime?
+  finishedAt  DateTime?
+
+  @@index([caseId])
+  @@index([status])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AI / RAG
+// ─────────────────────────────────────────────────────────────────────────────
+
+model AiChat {
+  id           String   @id @default(cuid())
+  caseId       String
+  case         Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  role         String
+  content      String
+  citations    String?
+  metadataJson String?
+  createdAt    DateTime @default(now())
+
+  @@index([caseId])
+}
+
+model Embedding {
+  id           String   @id @default(cuid())
+  caseId       String
+  evidenceId   String?
+  sha256       String?
+  seq          Int      @default(0)
+  text         String
+  vec          String?
+  metadataJson String?
+  createdAt    DateTime @default(now())
+
+  @@index([caseId])
+  @@index([evidenceId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INVESTIGATOR WORKSPACE
+// ─────────────────────────────────────────────────────────────────────────────
+
+model InvestigatorNote {
+  id           String   @id @default(cuid())
+  caseId       String
+  case         Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  body         String
+  metadataJson String? // Used for hypothesis storage (metadataJson.hypothesis = true)
+  createdAt    DateTime @default(now())
+}
+
+model ActivityLog {
+  id     String   @id @default(cuid())
+  caseId String?
+  case   Case?    @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  msg    String
+  at     DateTime @default(now())
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INVESTIGATOR DECISION RECORD (architecture §18)
+// Every human decision becomes structured intelligence:
+// WHO · WHAT · WHEN · CASE · OBJECT · BEFORE · AFTER · REASON
+// ─────────────────────────────────────────────────────────────────────────────
+
+model DecisionRecord {
+  id           String   @id @default(cuid())
+  uid          String   @unique // DEC-000001-style sequential ref is derived from index
+  caseId       String
+  case         Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  actor        String   @default("investigator")
+  action       String // approve_finding | reject_finding | modify_finding | confirm_hypothesis | reject_hypothesis | mark_unresolved | resolve_contradiction | reopen_contradiction | merge_entities | supersede_evidence | create_claim | explain_connection
+  objectType   String // finding | hypothesis | contradiction | entity | evidence | claim
+  objectRef    String? // id of the object the decision was taken on
+  objectLabel  String? // human-readable label for audit views
+  beforeState  String?
+  afterState   String?
+  reason       String?
+  evidenceJson String? // [{ evidenceId, name, locator }] relied upon
+  metadataJson String? // free-form extras (sufficiency, verification report, …)
+  at           DateTime @default(now())
+
+  @@index([caseId])
+  @@index([caseId, at])
+  @@index([caseId, action])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EVIDENCE VERSIONS — immutable EV-00001:v1 / v2 / v3 chains (architecture §2)
+// Never silently overwrite evidence: a re-submission supersedes, never replaces.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model EvidenceVersion {
+  id           String   @id @default(cuid())
+  evidenceId   String
+  evidence     Evidence @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+  version      Int // 1-based; v1 created on first ingest
+  sha256       String
+  storedPath   String?
+  size         Int      @default(0)
+  note         String? // why a new version was submitted
+  createdBy    String   @default("investigator")
+  supersedesId String? // previous EvidenceVersion.id
+  createdAt    DateTime @default(now())
+
+  @@unique([evidenceId, version])
+  @@index([evidenceId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BENCHMARK LAB (Task ID 33) — RED Justice Model Benchmark Engine
+// Controlled benchmarking of AI models on investigation-reasoning tasks.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model BenchmarkRun {
+  id           String   @id @default(cuid())
+  label        String?
+  status       String   @default("running") // running | complete | failed
+  configJson   String   @default("{}")
+  progressJson String   @default("{}") // { done, total, currentModel, currentTest }
+  modelsJson   String   @default("[]")
+  error        String?
+  createdAt    DateTime @default(now())
+  finishedAt   DateTime?
+  results      BenchmarkResult[]
+
+  @@index([createdAt])
+}
+
+model BenchmarkResult {
+  id                 String   @id @default(cuid())
+  runId              String
+  run                BenchmarkRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  model              String
+  provider           String
+  overallScore       Float    @default(0)
+  categoryScoresJson String   @default("{}")
+  metricsJson        String   @default("{}") // latencyMs avg/p95, testsRun, failures
+  detailsJson        String   @default("[]") // per-test: category, score, notes, latency, error, truncated response
+  createdAt          DateTime @default(now())
+
+  @@index([runId])
+  @@index([model])
+}

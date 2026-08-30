@@ -1,0 +1,23 @@
+# RED Justice — .dockerignore
+# Excludes files that shouldn't be in the Docker build context
+
+node_modules
+.next
+.git
+.gitignore
+dev.log
+server.log
+*.md
+upload
+tool-results
+agent-ctx
+tests
+examples
+mini-services
+skills
+download
+*.zip
+*.tar.gz
+.env
+.env.local
+.env.*.local
